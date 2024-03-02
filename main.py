@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import warnings
 import os
 from keras.models import load_model
+import uuid
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
@@ -14,6 +15,9 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 warnings.filterwarnings("ignore", category = DeprecationWarning)
 app = Flask(__name__)
 flask_cors.CORS(app)
+
+UPLOAD_FOLDER = 'uploads'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # ------------------- Braintumor PREDICTION API ------------------------
 
@@ -29,11 +33,15 @@ def brainTumor_prediction():
     try:
         image = request.files['image']
 
-        # Save the image to a temporary file
-        image.save('image.png')
-        
+        # Generate a unique filename using UUID
+        unique_filename = str(uuid.uuid4()) + '.png'
+        image_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+
+        # Save the image with a unique filename
+        image.save(image_path)
+
         # Load the image
-        img = cv2.imread('image.png')
+        img = cv2.imread(image_path)
 
         img = cv2.resize(img, (150, 150))
         img_array = np.array(img)
@@ -42,11 +50,12 @@ def brainTumor_prediction():
 
         a = brainTumor_model.predict(img_array)
         indices = a.argmax()
-        
-        print(indices)
 
-        return jsonify({'prediction': int(indices)}) 
-    
+        # Delete the image after prediction
+        os.remove(image_path)
+
+        return jsonify({'prediction': int(indices)})
+
     except Exception as e:
         # Handle any exceptions
         return jsonify({'error': str(e)})
